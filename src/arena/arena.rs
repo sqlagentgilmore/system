@@ -1,5 +1,6 @@
 use std::fmt::{Display, Formatter};
-use crate::{obj::Object};
+use crate::arena::obj::Object;
+
 #[derive(Debug, Default, Clone)]
 pub struct ArenaTree
 {
@@ -45,14 +46,8 @@ impl ArenaTree
         self.arena[parent].update_children(new_node_position);
     }
     
-    pub fn move_along_vec(&mut self) {
-        // cant move post the last position
-        if let Some(position) = self.curr {
-            if position == self.arena.len() - 1 {
-                return
-            }
-        }
-        self.curr.replace(self.curr.map(|val| val + 1).unwrap_or_default());
+    pub fn get_object_from_position(&self, position: usize) -> Object {
+        self.arena[position].clone()
     }
     
     pub fn get_current_objects_children(&self) -> Option<Vec<Object>> {
@@ -84,6 +79,9 @@ impl ArenaTree
             curr: Some(0)
         }
         
+    }
+    pub fn next_position(&mut self) {
+        self.curr = self.curr.map(|curr| curr + 1)
     }
 }
 

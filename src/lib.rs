@@ -1,42 +1,10 @@
-use crate::arena::ArenaTree;
-use crate::types::SystemType;
-
-mod types;
 mod arena;
-mod obj;
-mod obj_desc;
-
-pub struct Systems {
-    _system: ArenaTree,
-    _type: SystemType,
-}
-
-impl Systems {
-    pub fn new(system: impl Into<SystemType>) -> Self {
-        Self {
-            _system: ArenaTree::new(None),
-            _type: system.into()
-        }
-    }
-    
-    pub fn get_system(&self) -> &ArenaTree {
-        &self._system
-    }
-    
-    pub fn get_system_type(&self) -> &SystemType {
-        &self._type
-    }    
-    
-    pub fn get_system_mut(&mut self) -> &mut ArenaTree {
-        &mut self._system
-    }
-    
-}
+mod client;
 
 #[cfg(test)]
 mod tests {
-    use crate::arena::ArenaTree;
-    use crate::obj::Object;
+    use crate::arena::arena::ArenaTree;
+    use crate::arena::obj::Object;
 
     #[test]
     fn initialize() {
@@ -75,8 +43,6 @@ mod tests {
         assert_eq!(actual_position, expected_position);
         assert_eq!(t.get_current_objects_children(), None);
         assert_eq!(t.get_object(), expected_object1);
-        t.move_along_vec();
-        assert_eq!(t.get_object(), expected_object2);
         
     }
     
@@ -105,7 +71,7 @@ mod tests {
         
         assert_eq!(actual_position, expected_position);
         assert_eq!(t.get_current_objects_children(), expected_child_of_object_1);
-        t.move_along_vec();
+        t.next_position();
         assert_eq!(t.get_object(), expected_child_object);
         
     }
@@ -131,7 +97,7 @@ mod tests {
             assert_eq!(t.get_object(), expected_parent);
             
             // move to child 1
-            t.move_along_vec();
+            t.next_position();
             let expected_position = Some(1);
             let actual_position = t.current_position();
             assert_eq!(actual_position, expected_position);
@@ -139,7 +105,7 @@ mod tests {
             assert_eq!(t.get_object(), expected_child_object_1);
             
             // move to child 2
-            t.move_along_vec();
+            t.next_position();
             let expected_position = Some(2);
             let actual_position = t.current_position();
             assert_eq!(actual_position, expected_position);
@@ -147,7 +113,7 @@ mod tests {
             assert_eq!(t.get_object(), expected_child_object_2);
             
             // move to child 3
-            t.move_along_vec();
+            t.next_position();
             let expected_position = Some(3);
             let actual_position = t.current_position();
             assert_eq!(actual_position, expected_position);

@@ -1,6 +1,7 @@
 use std::fmt::{Display, Formatter};
+use serde::{Deserialize, Serialize};
 
-#[derive(PartialEq, Clone, Debug)]
+#[derive(PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub struct Description {
     name: String,
     display_name: Option<String>
