@@ -28,6 +28,9 @@ impl Node {
     pub fn index(&self) -> usize {
         self.index
     }
+    pub fn set_index(&mut self, index: usize) {
+        self.index = index
+    }
     pub fn has_parent(&self) -> bool {
         self.parent.is_some()
     }
@@ -37,10 +40,15 @@ impl Node {
     pub fn set_parent(&mut self, index: usize) {
         self.parent.replace(index);
     }
+    pub fn pop_parent(&mut self) -> Option<usize> {
+        self.parent.take()
+    }
     pub fn add_child(&mut self, index: usize) {
         match self.children {
             Some(ref mut children) => {
-                children.push(index);
+                if !children.contains(&index) {
+                    children.push(index);
+                }
             }
             ref mut children => {
                 children.replace(vec![index]);

@@ -3,7 +3,7 @@ use compact_str::{CompactString, ToCompactString};
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
 
-#[derive(PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(PartialEq, Clone, Debug, Serialize, Deserialize, Hash, Eq)]
 pub struct Value {
     name: compact_str::CompactString,
 }
