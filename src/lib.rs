@@ -5,8 +5,9 @@ mod value;
 #[cfg(test)]
 mod tests {
     use std::collections::HashMap;
+    use compact_str::{CompactString, ToCompactString};
     use crate::arena::Arena;
-    use crate::node::Value;
+    use crate::node::{Node, Value};
 
     #[test]
     fn test_new() {
@@ -17,62 +18,28 @@ mod tests {
     #[test]
     fn test_one_node() {
         let mut tree = Arena::new();
-        tree.add_root_node("node");
         assert!(tree.len().eq(&1));
-        assert_eq!(tree.index(), Some(0));
+        assert_eq!(tree.root_index(), 0);
     }
 
     #[test]
-    fn test_one_node_and_child() {
+    fn test_add_node() {
         let mut tree = Arena::new();
-        tree.add_root_node("node");
-        tree.add_child_node("tiny_node");
-        assert!(tree.len().eq(&2));
-        assert_eq!(tree.index(), Some(0));
-    }
-    #[test]
-    fn test_multi_level() {
-        let mut tree = Arena::new();
-        tree.add_root_node("node");
-        tree.add_child_node("tiny_node");
-        tree.advance();
-        tree.add_child_node("tiniest node");
-        tree.advance();
-        let expected_lineage = vec![1, 0];
-        let actual_lineage = tree.lineage();
-        assert_eq!(actual_lineage, expected_lineage);
-        tree.move_to_parent();
-        tree.add_child_node("other tiniest node");
-        let subtree = tree.subtree();
-        println!("{tree}");
-        println!("{subtree}");
-        assert_eq!(subtree.len(), 3);
-
-    }
-    #[test]
-    fn test_merge() {
-
-        let mut tree1 = Arena::new();
-        tree1.add_root_node("root");
-        tree1.add_child_node("node");
-        tree1.add_child_node("tiny_node");
-        tree1.advance();
-        tree1.add_child_node("tiniest node");
-        tree1.advance();
-        tree1.move_to_parent();
-        tree1.add_child_node("other tiniest node");
-        let len1 = tree1.len();
-        let mut tree2 = Arena::new();
-        tree2.add_root_node("node");
-        tree2.add_child_node("tiny_node");
-        tree2.advance();
-        tree2.add_child_node("tiniest node");
-        tree2.advance();
-        tree2.move_to_parent();
-        tree2.add_child_node("other tiniest node");
-        let len2 = tree2.len();
-        tree1.merge(tree2,0);
-        assert_eq!(tree1.len(), len1 + len2);
-
+        tree.add_node("node", "database", 0);
+        tree.add_node("child_node", "schema", 1);
+        tree.add_node("another_node", "schema", 0);
+        assert_eq!(tree.len(), 4);
+        let parents = tree.get_owned_parent_nodes(2);
+        let mut expected_root = Node::root();
+        expected_root.children = Some(vec![1, 3]);
+        let mut expected_child = Node::new("node", "database", 1, 0);
+        expected_child.children = Some(vec![2]);
+        let expected = vec![expected_child, expected_root];
+        for i in 0..parents.len() {
+            assert_eq!(parents[i].children, expected[i].children);
+            assert_eq!(parents[i].value, expected[i].value);
+            assert_eq!(parents[i].index, expected[i].index);
+            assert_eq!(parents[i].parent, expected[i].parent);
+        }
     }
 }

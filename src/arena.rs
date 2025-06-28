@@ -1,272 +1,185 @@
-use crate::node::{Node, Value};
-use std::collections::HashMap;
-use std::fmt::{Display, Formatter};
-use compact_str::ToCompactString;
+use crate::node::Node;
+use std::fmt::Display;
 
 #[derive(Debug, Default, Clone)]
 pub struct Arena {
-    arena: Vec<Node>,
-    index: Option<usize>,
+    nodes: Vec<Node>,
+    root: usize,
 }
 
 impl Arena {
     pub fn new() -> Self {
         Arena {
-            arena: vec![],
-            index: None,
+            nodes: vec![Node::root()],
+            root: 0,
         }
     }
     pub fn new_with_capacity(capacity: usize) -> Self {
-        Arena {
-            arena: Vec::with_capacity(capacity),
-            index: None,
-        }
-    }
-    pub fn advance(&mut self) {
-        self.set_index(
-            self.index.map(|index| index + 1).unwrap_or(0)
-        );
-    }
-    
-    pub fn move_to_parent(&mut self) {
-        if let Some(parent) = self.parent() {
-            self.set_index(parent);
-        }
-    }
-    fn set_index(&mut self, index: usize) {
-        self.index.replace(index);
-    }
-    pub fn index(&self) -> Option<usize> {
-        self.index
-    }
-    pub fn len(&self) -> usize {
-        self.arena.len()
+        let mut arena = Arena {
+            nodes: Vec::with_capacity(capacity),
+            root: 0,
+        };
+        arena.nodes.push(Node::root());
+        arena
     }
 
-    pub fn is_empty(&self) -> bool {
-        self.arena.is_empty()
+    pub fn get_node(&self, index: usize) -> Option<&Node> {
+        self.nodes.get(index)
     }
 
-    pub fn parent(&self) -> Option<usize> {
-        if let Some(index) = self.index {
-            self.parent_from_index(index)
+    pub fn get_mut_node(&mut self, index: usize) -> Option<&mut Node> {
+        self.nodes.get_mut(index)
+    }
+
+    pub fn get_root(&self) -> &Node {
+        &self.nodes[self.root]
+    }
+
+    pub fn get_parent_node(&self, index: usize) -> Option<&Node> {
+        if index == self.root {
+            return None; // Root node has no parent
+        }
+        if let Some(parent) = self.get_node(index).map(|node| node.parent().unwrap()) {
+            self.get_node(parent)
+        } else {
+            None
+        }
+    }
+    pub fn get_mut_parent_node(&mut self, index: usize) -> Option<&mut Node> {
+        if index == self.root {
+            return None; // Root node has no parent
+        }
+        if let Some(parent) = self.get_node(index).map(|node| node.parent().unwrap()) {
+            self.get_mut_node(parent)
         } else {
             None
         }
     }
 
-    pub fn parent_from_index(&self, index: usize) -> Option<usize> {
-        self.arena[index].parent()
-    }
-
-    /// useful when creating a new tree and you want new index references to parents and children
-    pub fn child_values_from_index(&self, index: usize) -> Option<Vec<Value>> {
-        self.arena[index].children().and_then(|children| {
-            let mut values = Vec::with_capacity(children.len());
-            for child in children {
-                if let Some(node) = self.node_from_index(*child) {
-                    values.push(node.value())
-                }
-            }
-            Some(values)
-        })
-    }
-
-    pub fn node(&self) -> Option<Node> {
-        if let Some(index) = self.index {
-            self.node_from_index(index)
-        } else {
-            None
+    pub fn add_node(&mut self, value: impl AsRef<str>, kind: &str, parent: usize) {
+        let index = self.nodes.len();
+        if let Some(parent) = self.get_mut_node(parent) {
+            let node = Node::new(value.as_ref(), kind, index, parent.index());
+            parent.add_child(index);
+            self.nodes.push(node);
         }
     }
 
-    pub fn node_from_index(&self, index: usize) -> Option<Node> {
-        if index < self.arena.len() {
-            Some(self.arena[index].clone())
-        } else {
-            None
-        }
-    }
-
-    pub fn node_by_value(&self, value: impl Into<Value>) {}
-
-    pub fn node_by_value_from_index(&self, value: impl Into<Value>, start: usize) -> Option<&Node> {
-        let value = value.into();
-        self.arena[start..]
-            .iter()
-            .find(|node| node.value().eq(&value))
-    }
-
-    pub fn lineage_for_index(&self, index: usize) -> Vec<usize> {
+    pub fn get_parent_nodes(&self, index: usize) -> Vec<&Node> {
         let mut parents = vec![];
-        let mut tmp_index = index;
-        while let Some(parent) = self
-            .node_from_index(tmp_index)
-            .and_then(|node| node.parent())
-        {
-            if let Some(node) = self.node_from_index(parent) {
-                parents.push(node.index());
-                tmp_index = parent;
+        let mut current_index = index;
+        while let Some(node) = self.get_parent_node(current_index) {
+            parents.push(node);
+            if current_index == self.root {
+                break; // Stop if we reach the root
             }
+            current_index = node.parent().unwrap();
         }
+        parents.reverse();
+        parents
+    }
+    pub fn get_owned_parent_nodes(&self, index: usize) -> Vec<Node> {
+        let mut parents = vec![];
+        let mut current_index = index;
+        while let Some(node) = self.get_parent_node(current_index) {
+            parents.push(node.clone());
+            current_index = node.parent().unwrap();
+
+
+        }
+        parents.reverse();
         parents
     }
 
-    pub fn lineage(&self) -> Vec<usize> {
-        if let Some(index) = self.index() {
-            self.lineage_for_index(index)
+    pub fn find_node_by_value(&self, value: &str) -> Option<&Node> {
+        self.nodes.iter().find(|node| node.value_as_str().eq(value))
+    }
+
+    pub fn get_children(&self, index: usize) -> Vec<Node> {
+        if let Some(node) = self.get_node(index) {
+            if let Some(children) = node.children() {
+                children.iter().map(|child| {
+                    self.nodes[*child].clone()
+                }).collect()
+            } else {
+                vec![]
+            }
         } else {
             vec![]
         }
     }
 
-    /// Tree born from the current position
-    ///
-    /// assumes ordering has been unchanged
-    pub fn subtree(&self) -> Self {
-        if let Some(index) = self.index {
-            self.subtree_from_index(index)
-        } else {
-            Self::new()
+    pub fn get_children_nodes(&self, index: usize) -> Vec<Node> {
+        let mut children = vec![];
+        self._get_children_nodes(index, &mut children);
+        children
+    }
+    pub fn _get_children_nodes(&self, mut index: usize, children: &mut Vec<Node>) {
+        for child in self.get_children(index) {
+            children.push(child.clone());
+            if child.children().is_some() {
+                self._get_children_nodes(child.index(), children);
+            }
         }
     }
-    pub fn subtree_from_index(&self, start_index: usize) -> Self {
-        let mut new_tree = Self::new();
-        let mut index_map: HashMap<usize, usize> = HashMap::new();
-        let mut queue = vec![start_index];
 
-        // First pass: collect all nodes in the subtree
-        let mut nodes_to_copy = vec![];
-        let mut visited = vec![false; self.arena.len()];
+    pub fn find_node(&self, value: &str, kind: &str) -> Option<&Node> {
+        self.nodes.iter().find(|node| node.value_as_str().eq(value) && node.kind_as_str().eq(kind))
+    }
 
-        while let Some(current_index) = queue.pop() {
-            if visited[current_index] {
-                continue;
-            }
-            visited[current_index] = true;
-            nodes_to_copy.push(current_index);
-            let parent = self.arena[current_index].children();
-            // Add children to queue
-            if let Some(children) =  parent {
-                for &child in children {
-                    queue.push(child);
-                }
-            }
+    pub fn len(&self) -> usize {
+        self.nodes.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.nodes.is_empty()
+    }
+
+    pub fn root_index(&self) -> usize {
+        self.root
+    }
+
+    pub fn swap_nodes(&mut self, index1: usize, index2: usize) {
+        if index1 >= self.nodes.len() || index2 >= self.nodes.len() {
+            panic!("Index out of bounds for swap_nodes");
         }
 
-        // Second pass: copy nodes with remapped indices
-        for (new_index, &old_index) in nodes_to_copy.iter().enumerate() {
-            index_map.insert(old_index, new_index);
-
-            let old_node = &self.arena[old_index];
-            let parent = if old_index == start_index {
-                None // Root of subtree has no parent
-            } else {
-                old_node.parent().and_then(|p| index_map.get(&p).copied())
-            };
-
-            let mut new_node = Node::new(old_node.value(), new_index, parent);
-
-            // Remap children indices
-            if let Some(old_children) = old_node.children() {
-                let new_children: Vec<usize> = old_children
-                    .iter()
-                    .filter_map(|&child| {
-                        // Only include children that are part of the subtree
-                        if nodes_to_copy.contains(&child) {
-                            Some(nodes_to_copy.iter().position(|&i| i == child).unwrap())
-                        } else {
-                            None
+        let update_parent_for_index = |arena: &mut Arena, index: usize, new_index: usize| {
+            if let Some(parent) = arena.get_mut_parent_node(index) {
+                if let Some(ref mut children) = parent.children {
+                    for child in children.iter_mut() {
+                        if *child == index {
+                            *child = new_index;
+                            break;
                         }
-                    })
-                    .collect();
-
-                if !new_children.is_empty() {
-                    new_node.set_children(new_children);
+                    }
                 }
             }
+        };
 
-            new_tree.arena.push(new_node);
-        }
+        let update_children_for_index = |arena: &mut Arena, index: usize, new_index: usize| {
+            if let Some(node) = arena.get_mut_node(index) {
+                if let Some(ref mut children) = node.children {
+                    for child in children.iter_mut() {
+                        if *child == index {
+                            *child = new_index;
+                        }
+                    }
+                }
+            }
+        };
 
-        // Set the index to the root of the new tree
-        new_tree.set_index(0);
-        new_tree
-    }
+        update_parent_for_index(self, index1, index2);
+        update_parent_for_index(self, index2, index1);
+        update_children_for_index(self, index1, index2);
+        update_children_for_index(self, index2, index1);
 
-    pub fn add_root_node(&mut self, value: impl Into<Value>) {
-        let index = self.arena.len();
-        self.arena.push(Node::new(value, index, None));
-        self.index.replace(index);
-    }
-    pub fn add_child_node(&mut self, value: impl Into<Value>) {
-        let child_node_index = self.arena.len();
-        self.arena
-            .push(Node::new(value, child_node_index, self.index));
-        self.arena[self.index.expect("expect to have an index to add a child")].add_child(child_node_index);
-    }
-    pub fn find_merge_index (&mut self, other: &Self) -> Option<usize> {
-        for node in other.arena.iter() {
-            if node.has_parent() {
-                break;
-            }
-            if let Some(node) = self.arena.iter().find(|val| val.value() == node.value()) {
-                return Some(node.index())
-            }
-        }
-        None
-    }
-    pub fn merge(&mut self, mut other: Self, merge_index: usize) {
-        if merge_index >= self.arena.len() {
-            panic!("merge_index {} is out of bounds for arena of length {}", 
-                   merge_index, self.arena.len());
-        }
-        
-        if other.is_empty() {
-            return;
-        }
-        
-        // Calculate the offset for remapping indices
-        let offset = self.arena.len();
-        // First, update all indices in the other arena
-        for (i, node) in other.arena.iter_mut().enumerate() {
-            // Update node's own index
-            node.set_index( offset + i);
-            
-            // Update parent index
-            if i == 0 {
-                // Root of other arena becomes child of merge_index
-                node.set_parent(merge_index);
-            } else if let Some(parent) = node.parent() {
-                node.set_parent(parent + offset);
-            }
-            
-            // Update children indices
-            if let Some(children) = node.children() {
-                let remapped_children: Vec<usize> = children
-                    .iter()
-                    .map(|&child| child + offset)
-                    .collect();
-                node.set_children(remapped_children);
-            }
-        }
-        
-        // Add the root of the merged tree as a child of merge_index
-        if let Some(merge_parent) = self.arena.get_mut(merge_index) {
-            merge_parent.add_child(offset); // offset is the index of other's root
-        }
-        
-        // Move all nodes from other arena to self
-        self.arena.append(&mut other.arena);
-    }
-}
+        let mut original_node1 = self.nodes[index1].clone();
+        let mut original_node2 = self.nodes[index2].clone();
 
-impl Display for Arena {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        for node in &self.arena {
-            let tabs = self.lineage_for_index(node.index()).iter().map(|t| "\t").collect::<String>();
-            writeln!(f, "{tabs}{}", node)?
-        }
-        Ok(())
+        self.nodes[index1].swap(&mut original_node2);
+        self.nodes[index2].swap(&mut original_node1);
+
+
     }
 }
